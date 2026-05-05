@@ -177,26 +177,24 @@ def lexer(entry_lines):
           partial_alpha_token = ""
 
         if next_character == "." and next_next_character == ".":
-          if partial_num:                    # ← flush número ANTES del spread
+          if partial_num:                 
             tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
             partial_num = ""
             has_dot = False
           tokens.append(f'<tkn_spread,{fila},{columna}>')
           skip = 2
 
-        elif partial_num and not has_dot and next_character in NUMS:
-          partial_num += character           # 34.45 → sigue el número
+        elif partial_num and not has_dot and next_character and next_character in NUMS:
+          partial_num += character         
           has_dot = True
 
-        elif not partial_num and next_character in NUMS:
-          # Solo comienza número con punto si el anterior NO es spread
+        elif not partial_num and next_character and next_character in NUMS:
           last_token = tokens[-1] if tokens else ""
           if not last_token.startswith("<tkn_spread"):
-            num_start = columna                # .045 → número que comienza con punto
+            num_start = columna             
             partial_num = "."
             has_dot = True
           else:
-            # Es período después de spread
             tokens.append(f'<tkn_period,{fila},{columna}>')
 
         else:
