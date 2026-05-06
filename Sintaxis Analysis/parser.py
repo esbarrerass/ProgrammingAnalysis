@@ -3,24 +3,12 @@ import re
 
 ESCAPE = re.compile(r'\\u(?:\{([0-9A-Fa-f]{1,6})\}|([0-9A-Fa-f]{4}))')
 
-KEYWORDS = {"capturar","caso","con","continuar","crear","desde","elegir","esperar","exportar","hacer","importar","mientras","para","retornar","sino","si","constructor",
-              "eliminar","extiende","finalmente","instanciaDe","intentar","lanzar","longitud","romper","simbolo","subcad","tipoDe","vacio",
-              "producir","ambiente","ambienteGlobal","super","de","en","asincrono","clase","const","var","mut","porDefecto","funcion","falso","nulo","verdadero","indefinido",
-              "Infinito","NuN","consola","depurador","establecerTemporizador","establecerIntervalo","Fecha","Numero","Mate","Matriz","Arreglo","Booleano","Cadena","Funcion","Promesa","afirmar","limpiar","listar",
-              "error","agrupar","info","escribir","tabla","enPosicion","caracterEn","codigoDeCaracterEn","puntoDeCodigoEn","concatenar",
-              "terminaCon","desdeCodigoDeCaracter","desdePuntoDeCodigo","incluye","indiceDe","ultimoIndiceDe","compararLocalizada","coincidir",
-              "coincidirTodo","normalizar","rellenarAlFinal","rellenarAlComienzo","crudo","repetir","reemplazar","reemplazarTodo","buscarRegex",
-              "recortar","dividir","comienzaCon","subcadena","aMinusculasLocalizada","aMayusculasLocalizada","aMinusculas","aMayusculas",
-              "aCadena","recortarEspacios","recortarEspaciosAlFinal","recortarEspaciosAlComienzo","valorDe","esNuN","esFinito","esEntero",
-              "esEnteroSeguro","interpretarDecimal","interpretarEntero","aExponencial","fijarDecimales","aCadenaLocalizada","aPrecision",
-              "absoluto","arcocoseno","arcocosenoHiperbolico","arcoseno","arcosenoHiperbolico","arcotangente","arcotangente2",
-              "arcotangenteHiperbolica","raizCubica","redondearHaciaArriba","cerosALaIzquierdaEn32Bits","coseno","cosenoHiperbolico",
-              "exponencial","exponencialMenos1","redondearHaciaAbajo","redondearAComaFlotante","hipotenusa","multiplicacionEntera","logaritmo",
-              "logaritmoBase10","logaritmoDe1Mas","logaritmoBase2","maximo","minimo","potencia","aleatorio","redondear","signo","seno",
-              "senoHiperbolico","raizCuadrada","tangente","tangenteHiperbolica","truncar","posicion","copiarDentro","entradas","cada","llenar",
-              "filtrar","buscar","buscarIndice","buscarUltimo","buscarUltimoIndice","plano","planoMapear","paraCada","grupo","grupoAMapear",
-              "juntar","claves","mapear","sacar","agregar","reducir","reducirDerecha","reverso","sacarPrimero","rodaja","algun","ordenar",
-              "empalmar","agregarInicio","valores"}
+KEYWORDS = {"var", "mut", "const", "capturar", "caso", "continuar", "crear", "elegir",
+            "hacer", "mientras", "para", "retornar", "sino", "si", "intentar", "romper",
+            "porDefecto", "funcion", "falso", "nulo", "verdadero", "indefinido",
+            "Infinito", "NuN", "consola", "Numero", "Mate", "Matriz", "Arreglo",
+            "Booleano", "Cadena", "afirmar", "limpiar", "error", "agrupar", "info",
+            "escribir", "tabla"}
 
 SYMBOLS = ["&","|",".",",",";",":","{","}","[","]","(",")","+","-","*","/","%","=",">","<","!","?"]
 
@@ -54,21 +42,24 @@ def escape_to_char(secuence):
     if is_surrogate_pair(escape): return None
     return chr(escape) if escape <= 0x10FFFF else None
 
-def add_token(tokens, partial_alpha_token, keywords, fila, alpha_token_start):
+def add_word(tokens, partial_alpha_token, keywords, fila, alpha_token_start):
     if partial_alpha_token in keywords:
         tokens.append(f'<{partial_alpha_token},{fila},{alpha_token_start}>') 
     elif len(partial_alpha_token) > 0: 
         tokens.append(f'<id,{partial_alpha_token},{fila},{alpha_token_start}>')
 
+def add_number(tokens, partial_num, fila, num_start):
+    tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+
 def lexer(entry_lines):
     tokens = []
-    long_comment = False
+    open_long_comment = False
 
     for fila in range(1, len(entry_lines) + 1):
         line = entry_lines[fila - 1]
         partial_alpha_token = ""
         partial_num = ""
-        in_string = False 
+        open_string = False 
         string_delim = ""      
         partial_string = ""      
         string_start_col = 0  
@@ -86,50 +77,53 @@ def lexer(entry_lines):
             next_character = line[columna] if columna < len(line) else ""
             next_next_character = line[columna + 1] if columna < len(line) - 1 else ""
 
-            # Comments
-            if long_comment:
+            # For everything inside a long comment 
+            if open_long_comment:
                 if character == "*" and next_character == "/":
-                    long_comment = False
+                    open_long_comment = False
                     skip = 1
                 continue
 
             # Strings
-            elif in_string:
+            elif open_string:
                 if character == "\\" and next_character == string_delim:
                     partial_string += character + next_character
                     skip = 1
                 elif character == string_delim:
-                    in_string = False
+                    open_string = False
                     tokens.append(f'<tkn_str,{partial_string},{fila},{string_start_col}>')
                     partial_string = ""
                 else:
                     partial_string += character
 
+            # To open a long comment
             elif character == "/" and next_character == "*": 
-                long_comment = True
+                open_long_comment = True
                 skip = 1
 
+            # To open a single line comment
             elif character == "/" and next_character == "/":
                 break
 
+            # To open a string
             elif character in ('"', "'", "`"):
-                add_token(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
+                add_word(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
                 partial_alpha_token = ""
                 if partial_num:
-                    tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+                    add_number(tokens, partial_num, fila, num_start)
                     partial_num = ""
                     has_dot = False
-                in_string = True
+                open_string = True
                 string_delim = character
                 string_start_col = columna
                 partial_string = ""
 
             # Spaces -> FLUSH
             elif character.isspace():
-                add_token(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
+                add_word(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
                 partial_alpha_token = ""
                 if partial_num:         
-                    tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+                    add_number(tokens, partial_num, fila, num_start)
                     partial_num = ""
                     has_dot = False
 
@@ -153,7 +147,7 @@ def lexer(entry_lines):
             # Identifiers and Keywords
             elif (is_id_start if len(partial_alpha_token) == 0 else is_id_continue)(character):
                 if partial_num:                                      
-                    tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+                    add_number(tokens, partial_num, fila, num_start)
                     partial_num = ""
                     has_dot = False
                 if len(partial_alpha_token) == 0: alpha_token_start = columna
@@ -164,16 +158,17 @@ def lexer(entry_lines):
                 if not partial_num: num_start = columna
                 partial_num += character
 
-            # Period - puede ser parte del número o un token separado, tambien hace FLUSH
+            # Period - special case because it can be part of a number or an spread
             elif character == ".":
-                if len(partial_alpha_token) > 0:
-                    add_token(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
-                    partial_alpha_token = ""
+                add_word(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
+                partial_alpha_token = ""
 
-                elif partial_num and not has_dot and next_character and next_character in NUMS:
+                #Possible decimal
+                if partial_num and not has_dot and next_character and next_character in NUMS:
                     partial_num += character
                     has_dot = True
 
+                #Possible numbers of the form .49 -> 0.49
                 elif not partial_num and next_character and next_character in NUMS:
                     last_token = tokens[-1] if tokens else ""
                     if not last_token.startswith("<tkn_spread"):
@@ -185,18 +180,21 @@ def lexer(entry_lines):
 
                 else:
                     if partial_num:
-                        tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+                        add_number(tokens, partial_num, fila, num_start)
                         partial_num = ""
                         has_dot = False
-                    tokens.append(f'<tkn_period,{fila},{columna}>')
+                    if next_character and next_character == "." and next_next_character and next_next_character == ".":
+                        tokens.append(f'<tkn_spread,{fila},{columna}>')
+                        skip = 2
+                    else:
+                        tokens.append(f'<tkn_period,{fila},{columna}>')
 
             # Symbols and Operators
             elif character in SYMBOLS:
-                if len(partial_alpha_token) > 0:
-                    add_token(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
-                    partial_alpha_token = ""
+                add_word(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
+                partial_alpha_token = ""
                 if partial_num:
-                    tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+                    add_number(tokens, partial_num, fila, num_start)
                     partial_num = ""
                     has_dot = False
                 three = character + next_character + next_next_character
@@ -211,17 +209,17 @@ def lexer(entry_lines):
                     elif character in ONE_OPER:
                         tokens.append(f'<tkn_{ONE_OPER[character]},{fila},{columna}>')
         
-        if in_string:
+        if open_string:
             return tokens
         
         if partial_num:
-            tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
+            add_number(tokens, partial_num, fila, num_start)
             partial_num = ""
             has_dot = False
 
-        add_token(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
+        add_word(tokens, partial_alpha_token, KEYWORDS, fila, alpha_token_start)
     
-    if long_comment: 
+    if open_long_comment: 
         return tokens
 
     return tokens
@@ -1255,9 +1253,7 @@ class Parser:
         return True
     
     def parse(self):
-        """Inicia el análisis sintáctico"""
-        if self.programa():
-            return True
+        if self.programa(): return True
         return False
 
 
