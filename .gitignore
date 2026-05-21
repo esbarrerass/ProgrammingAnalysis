@@ -1,0 +1,17 @@
+.antlr/
+/.claude
+*.jar
+
+.DS_Store
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.log
+.env
+.venv/
+venv/
+*.class
+*.tokens
+*.interp

@@ -3,24 +3,12 @@ import re
 
 ESCAPE = re.compile(r'\\u(?:\{([0-9A-Fa-f]{1,6})\}|([0-9A-Fa-f]{4}))')
 
-KEYWORDS = {"capturar","caso","con","continuar","crear","elegir","esperar","hacer","mientras","para","retornar","sino","si","constructor",
-              "eliminar","extiende","finalmente","instanciaDe","intentar","lanzar","longitud","romper","simbolo","subcad","tipoDe","vacio",
-              "ambiente","super","de","en","clase","const","var","mut","porDefecto","funcion","falso","nulo","verdadero","indefinido",
-              "Infinito","NuN","consola","Fecha","Numero","Mate","Matriz","Arreglo","Booleano","Cadena","Funcion","afirmar","limpiar","listar",
-              "error","agrupar","info","escribir","tabla","enPosicion","caracterEn","codigoDeCaracterEn","puntoDeCodigoEn","concatenar",
-              "terminaCon","desdeCodigoDeCaracter","desdePuntoDeCodigo","incluye","indiceDe","ultimoIndiceDe","compararLocalizada","coincidir",
-              "coincidirTodo","normalizar","rellenarAlFinal","rellenarAlComienzo","crudo","repetir","reemplazar","reemplazarTodo","buscarRegex",
-              "recortar","dividir","comienzaCon","subcadena","aMinusculasLocalizada","aMayusculasLocalizada","aMinusculas","aMayusculas",
-              "aCadena","recortarEspacios","recortarEspaciosAlFinal","recortarEspaciosAlComienzo","valorDe","esNuN","esFinito","esEntero",
-              "esEnteroSeguro","interpretarDecimal","interpretarEntero","aExponencial","fijarDecimales","aCadenaLocalizada","aPrecision",
-              "absoluto","arcocoseno","arcocosenoHiperbolico","arcoseno","arcosenoHiperbolico","arcotangente","arcotangente2",
-              "arcotangenteHiperbolica","raizCubica","redondearHaciaArriba","cerosALaIzquierdaEn32Bits","coseno","cosenoHiperbolico",
-              "exponencial","exponencialMenos1","redondearHaciaAbajo","redondearAComaFlotante","hipotenusa","multiplicacionEntera","logaritmo",
-              "logaritmoBase10","logaritmoDe1Mas","logaritmoBase2","maximo","minimo","potencia","aleatorio","redondear","signo","seno",
-              "senoHiperbolico","raizCuadrada","tangente","tangenteHiperbolica","truncar","posicion","copiarDentro","entradas","cada","llenar",
-              "filtrar","buscar","buscarIndice","buscarUltimo","buscarUltimoIndice","plano","planoMapear","paraCada","grupo","grupoAMapear",
-              "juntar","claves","mapear","sacar","agregar","reducir","reducirDerecha","reverso","sacarPrimero","rodaja","algun","ordenar",
-              "empalmar","agregarInicio","valores"}
+KEYWORDS = {"var", "mut", "const", "capturar", "caso", "continuar", "crear", "elegir",
+            "hacer", "mientras", "para", "retornar", "sino", "si", "intentar", "romper",
+            "porDefecto", "funcion", "falso", "nulo", "verdadero", "indefinido",
+            "Infinito", "NuN", "consola", "Numero", "Mate", "Matriz", "Arreglo",
+            "Booleano", "Cadena", "afirmar", "limpiar", "error", "agrupar", "info",
+            "escribir", "tabla"}
 
 SYMBOLS = ["&","|",".",",",";",":","{","}","[","]","(",")","+","-","*","/","%","=",">","<","!","?"]
 
@@ -177,7 +165,7 @@ def lexer(entry_lines):
           partial_alpha_token = ""
 
         if next_character == "." and next_next_character == ".":
-          if partial_num:                 
+          if partial_num:                    # ← flush número ANTES del spread
             tokens.append(f'<tkn_num,{partial_num},{fila},{num_start}>')
             partial_num = ""
             has_dot = False
@@ -185,16 +173,18 @@ def lexer(entry_lines):
           skip = 2
 
         elif partial_num and not has_dot and next_character and next_character in NUMS:
-          partial_num += character         
+          partial_num += character           # 34.45 → sigue el número
           has_dot = True
 
         elif not partial_num and next_character and next_character in NUMS:
+          # Solo comienza número con punto si el anterior NO es spread
           last_token = tokens[-1] if tokens else ""
           if not last_token.startswith("<tkn_spread"):
-            num_start = columna             
+            num_start = columna                # .045 → número que comienza con punto
             partial_num = "."
             has_dot = True
           else:
+            # Es período después de spread
             tokens.append(f'<tkn_period,{fila},{columna}>')
 
         else:
