@@ -1,4 +1,5 @@
 .antlr/
+.idea/
 /.claude
 *.jar
 
